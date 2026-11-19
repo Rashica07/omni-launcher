@@ -1,0 +1,35 @@
+# OMNI Client's opening film: the cubes assemble into the OMNI Launcher logo over the title screen,
+# once per launch (~4 s), then the charcoal fades into the title. Our own Blender scene (intro/),
+# nothing from Mojang. Needs the "hooks" API 411 (client_start/gui_render_post/frame).
+[mod]
+id = "omni_intro"
+version = "0.1.0"
+
+# Once a frame: advance the clock (only while the film is showing) and upload the next film frame.
+[[injection]]
+id = "frame"
+hook = "frame"
+hook_version = 1
+kind = "HEAD"
+helper = "frame.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "elapsed", ty = "std::time::Duration", value = "elapsed" },
+]
+
+# After the whole GUI (title screen included): draw the film over it.
+[[injection]]
+id = "post"
+hook = "gui_render_post"
+hook_version = 1
+kind = "HEAD"
+helper = "post.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
+
+# The film's frames (3 MB of PNG) and the clock live in the mod's own crate, compiled once.
+[[crate]]
+id = "engine"
+path = "engine"
