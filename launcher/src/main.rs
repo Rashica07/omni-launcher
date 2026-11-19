@@ -73,6 +73,7 @@ mod skin_page;
 mod omni_backdrop;
 mod omni_hero;
 mod omni_intro;
+mod omni_intro_mod;
 mod omni_ui;
 mod sky;
 mod specimen;

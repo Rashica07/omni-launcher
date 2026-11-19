@@ -5,6 +5,10 @@
 id = "omni_intro"
 version = "0.1.0"
 
+# The Horizon commit the hooks were checked on (the .hnmod manifest carries the hooks version, 411).
+[compatibility]
+horizon_revision = "1d63e0a5a37a7a708eb0b32b49bf0dfeb28ed8a9"
+
 # Once a frame: advance the clock (only while the film is showing) and upload the next film frame.
 [[injection]]
 id = "frame"

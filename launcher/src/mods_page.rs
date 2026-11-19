@@ -1745,6 +1745,24 @@ impl Launcher {
                 })),
             );
         }
+        // OMNI's opening film for the game (`omni_intro_mod`): put in this instance and turned
+        // on, then Build plays it. Only offered while it is not in the instance.
+        if idle && omni_ui::on() && !omni_intro_mod::installed(&home) {
+            let target = home.clone();
+            right = right.child(
+                button("native-omni-intro", "Add OMNI intro", Kind::Secondary, &t).on_click(
+                    cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        match omni_intro_mod::install(&target) {
+                            Ok(()) => this.native_error = None,
+                            Err(e) => this.native_error = Some(e),
+                        }
+                        this.native_for = this.selected_instance().map(|i| i.id.clone());
+                        this.mods.native_state.borrow_mut().take();
+                        cx.notify();
+                    }),
+                ),
+            );
+        }
         if can_build {
             right = right.child(button("native-build", "Build", Kind::Primary, &t).on_click(
                 cx.listener(|this, _: &ClickEvent, _, cx| {
