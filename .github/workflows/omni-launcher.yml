@@ -1,0 +1,76 @@
+# Builds OMNI Launcher (unsigned dev builds) for macOS (Apple Silicon), Windows (x64) and Linux (x64).
+# Run it by hand (Actions > omni-launcher > Run workflow) or push a tag like omni-launcher-v0.2.0-dev.1:
+# a tag publishes the three files as a GitHub prerelease.
+name: omni-launcher
+on:
+  workflow_dispatch:
+  push:
+    tags: ["omni-launcher-v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, target: aarch64-apple-darwin, name: macos-arm64 }
+          - { os: windows-2022, target: x86_64-pc-windows-msvc, name: windows-x64 }
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, name: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: launcher }
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-x11-dev libxkbcommon-dev libwayland-dev libx11-xcb-dev libxcb1-dev libasound2-dev libfontconfig1-dev libfreetype6-dev libssl-dev libvulkan-dev pkg-config cmake clang
+      - name: Build
+        working-directory: launcher
+        run: cargo build --release --bin omni-launcher --target ${{ matrix.target }}
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          app="OMNI Launcher.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp launcher/target/${{ matrix.target }}/release/omni-launcher "$app/Contents/MacOS/omni-launcher"
+          cp packaging/icons/omni-launcher.icns "$app/Contents/Resources/AppIcon.icns"
+          sed "s/@VERSION@/0.2.0/g" packaging/macos/Info-omni.plist > "$app/Contents/Info.plist"
+          printf 'APPL????' > "$app/Contents/PkgInfo"
+          codesign --force --deep --sign - "$app"
+          ditto -c -k --keepParent "$app" "OMNI-Launcher-${{ matrix.name }}.zip"
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path launcher/target/${{ matrix.target }}/release/omni-launcher.exe -DestinationPath OMNI-Launcher-${{ matrix.name }}.zip
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          d=omni-launcher; mkdir $d
+          cp launcher/target/${{ matrix.target }}/release/omni-launcher $d/
+          cp packaging/linux/omni-launcher.desktop $d/
+          cp packaging/icons/hicolor/256x256/apps/omni-launcher.png $d/omni-launcher.png
+          tar -czf OMNI-Launcher-${{ matrix.name }}.tar.gz $d
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OMNI-Launcher-${{ matrix.name }}
+          path: OMNI-Launcher-${{ matrix.name }}.*
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: OMNI Launcher ${{ github.ref_name }} (dev build)
+          body: |
+            Development build of OMNI Launcher. Unsigned: macOS may ask you to right-click > Open, Windows SmartScreen may warn. Not an official Minecraft product.
+          files: dist/*

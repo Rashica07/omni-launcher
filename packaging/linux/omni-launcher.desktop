@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=OMNI Launcher
+GenericName=Minecraft launcher
+Comment=OMNI Launcher, a Minecraft launcher
+Exec=omni-launcher
+Icon=omni-launcher
+Terminal=false
+Categories=Game;
+StartupWMClass=omni-launcher

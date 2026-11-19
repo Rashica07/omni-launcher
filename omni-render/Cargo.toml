@@ -1,0 +1,9 @@
+[package]
+name = "omni-render"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "OMNI Launcher's per-frame picture work, kept in its own crate so it is optimised in development builds too"
+
+[dependencies]
+horizon-cosmetics = { path = "../crates/horizon-cosmetics" }

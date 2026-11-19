@@ -1,0 +1,282 @@
+//! The blocky look's parts (`docs/design-system.md`, "Blocks"): pixel type, pixel icons, panels
+//! with a dark outline, a light bevel on top and a darker lip below, sunk wells, badges, the
+//! inventory tabs, and the slots that hold icons downloaded at run time.
+use crate::theme::{self, Theme};
+use gpui::{
+    div, img, prelude::*, px, svg, AnyElement, App, ClickEvent, Div, FontWeight, Hsla, ImageSource,
+    ObjectFit, SharedString, Svg, Window,
+};
+use std::borrow::Cow;
+
+/// The icons, served to `svg()` as `icons/<name>.svg`.
+pub struct Assets;
+
+impl gpui::AssetSource for Assets {
+    fn load(&self, path: &str) -> gpui::Result<Option<Cow<'static, [u8]>>> {
+        if let Some(name) = path
+            .strip_prefix("icons/glass/")
+            .and_then(|p| p.strip_suffix(".svg"))
+        {
+            return Ok(horizon_theme::glass_icons::get(name).map(Cow::Borrowed));
+        }
+        let name = path
+            .strip_prefix("icons/")
+            .and_then(|p| p.strip_suffix(".svg"));
+        Ok(name.and_then(horizon_theme::icons::get).map(Cow::Borrowed))
+    }
+
+    fn list(&self, _path: &str) -> gpui::Result<Vec<SharedString>> {
+        Ok(horizon_theme::icons::ALL
+            .iter()
+            .map(|(name, _)| format!("icons/{name}.svg").into())
+            .chain(
+                horizon_theme::glass_icons::ALL
+                    .iter()
+                    .map(|(name, _)| format!("icons/glass/{name}.svg").into()),
+            )
+            .collect())
+    }
+}
+
+/// A pixel icon (`horizon_theme::icons`) in `color`.
+pub fn icon(name: &'static str, size: f32, color: Hsla) -> Svg {
+    svg()
+        .path(format!("icons/{name}.svg"))
+        .flex_none()
+        .size(px(size))
+        .text_color(color)
+}
+
+/// Text in the pixel face: headings, navigation, buttons, badges.
+pub fn pixel(size: f32, weight: FontWeight) -> Div {
+    div()
+        // OMNI sets its interface in one typeface; the pixel font stays Horizon's.
+        .font_family(if crate::omni_ui::on() { theme::FONT } else { theme::PIXEL })
+        .font_weight(weight)
+        .text_size(px(size))
+        .line_height(px((size * 1.2).round()))
+}
+
+/// The light edge along the top of a raised block and the darker lip along its bottom; the
+/// block must be `relative`.
+pub fn edges(top: Hsla, bottom: Hsla, lip: f32) -> [AnyElement; 2] {
+    [
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .right_0()
+            .h(px(theme::BEVEL))
+            .bg(top)
+            .into_any_element(),
+        div()
+            .absolute()
+            .bottom_0()
+            .left_0()
+            .right_0()
+            .h(px(lip))
+            .bg(bottom)
+            .into_any_element(),
+    ]
+}
+
+/// A panel: rows, cards, notices, dialogs.
+pub fn panel(t: &Theme) -> Div {
+    // The glass look: a glass plate, round at 16 (its tokens leave no border or bevel to see).
+    if t.glass {
+        return crate::glass::plate(horizon_theme::glass::radius::POPOVER);
+    }
+    if crate::omni_ui::on() {
+        return div()
+            .relative()
+            .bg(crate::omni_ui::surface())
+            .rounded(px(crate::omni_ui::RADIUS))
+            .border_1()
+            .border_color(crate::omni_ui::hairline());
+    }
+    div()
+        .relative()
+        .bg(t.panel)
+        .border_2()
+        .border_color(t.outline)
+        .children(edges(t.bevel, t.lip, theme::BEVEL))
+}
+
+/// A box drawn as a panel is: OMNI's soft surface with a hairline, else Horizon's bevelled box.
+/// For boxes built in place (a release row) rather than with [`panel`].
+pub fn framed<E: Styled + ParentElement>(d: E, t: &Theme) -> E {
+    if crate::omni_ui::on() {
+        return d
+            .bg(crate::omni_ui::surface())
+            .rounded(px(crate::omni_ui::RADIUS))
+            .border_1()
+            .border_color(crate::omni_ui::hairline());
+    }
+    d.bg(t.panel)
+        .border_2()
+        .border_color(t.outline)
+        .children(edges(t.bevel, t.lip, theme::BEVEL))
+}
+
+/// A small label in a block of its colour: "Runs", "Partly", a version.
+pub fn badge(label: impl Into<SharedString>, color: Hsla, t: &Theme) -> Div {
+    let label: SharedString = label.into();
+    let label = SharedString::from(crate::i18n::tr(&label).to_string());
+    let tint = if t.dark { 0.14 } else { 0.12 };
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .gap(px(6.))
+        .h(px(22.))
+        .px(px(8.))
+        .bg(color.opacity(tint))
+        .when(!crate::omni_ui::on(), |d| d.border_2().border_color(t.outline))
+        .when(crate::omni_ui::on(), |d| d.rounded(px(4.)))
+        .child(div().size(px(6.)).bg(color))
+        .child(
+            pixel(12., FontWeight::MEDIUM)
+                .text_color(color)
+                .child(label),
+        )
+}
+
+/// Inventory tabs: a row of tabs on top of a panel, the open one joined to it.
+pub fn tabs<T: Copy + PartialEq + 'static>(
+    id: &'static str,
+    options: &[(T, &'static str, &'static str)],
+    current: T,
+    t: &Theme,
+    on_pick: impl Fn(T, &mut Window, &mut App) + Clone + 'static,
+) -> Div {
+    let t = *t;
+    if crate::omni_ui::on() {
+        return omni_tabs(id, options, current, &t, on_pick);
+    }
+    div()
+        .flex()
+        .items_end()
+        .gap(px(4.))
+        .children(options.iter().map(|&(value, label, icon_name)| {
+            let open = current == value;
+            let pick = on_pick.clone();
+            let tab = div()
+                .id(SharedString::from(format!("{id}-{label}")))
+                .relative()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .h(px(if open { 42. } else { 38. }))
+                .px(px(14.))
+                .border_2()
+                .border_b_0()
+                .border_color(t.outline)
+                .cursor_pointer()
+                .bg(if open { t.panel } else { t.side })
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .right_0()
+                        .h(px(theme::BEVEL))
+                        .bg(if open { t.bevel } else { t.raised }),
+                )
+                .child(icon(icon_name, 18., if open { t.accent } else { t.muted }))
+                .child(
+                    pixel(15., FontWeight::MEDIUM)
+                        .text_color(if open { t.ink } else { t.muted })
+                        .child(crate::i18n::tr(label)),
+                )
+                .when(!open, |d| d.hover(move |s| s.bg(t.raised)))
+                // The open tab covers the panel's outline under it.
+                .when(open, |d| d.mb(px(-2.)))
+                .on_click(move |_: &ClickEvent, window, cx| pick(value, window, cx));
+            crate::keyboard(tab, &t)
+        }))
+}
+
+/// OMNI's tabs: icon and name on the page, the open one in cream with a red bar under it, the
+/// row underlined by a hairline. No boxes.
+fn omni_tabs<T: Copy + PartialEq + 'static>(
+    id: &'static str,
+    options: &[(T, &'static str, &'static str)],
+    current: T,
+    t: &Theme,
+    on_pick: impl Fn(T, &mut Window, &mut App) + Clone + 'static,
+) -> Div {
+    let t = *t;
+    div()
+        .flex()
+        .flex_wrap()
+        .items_end()
+        .gap(px(24.))
+        .border_b_1()
+        .border_color(crate::omni_ui::hairline())
+        .mb(px(16.))
+        .children(options.iter().map(|&(value, label, icon_name)| {
+            let open = current == value;
+            let pick = on_pick.clone();
+            let ink = if open { t.ink } else { t.muted };
+            let tab = div()
+                .id(SharedString::from(format!("{id}-{label}")))
+                .relative()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .h(px(40.))
+                .cursor_pointer()
+                .child(icon(icon_name, 16., ink))
+                .child(
+                    div()
+                        .font_family(theme::FONT)
+                        .text_size(px(14.))
+                        .font_weight(if open { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
+                        .text_color(ink)
+                        .child(crate::i18n::tr(label)),
+                )
+                .when(open, |d| {
+                    d.child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .bottom(px(-1.))
+                            .h(px(2.))
+                            .bg(crate::omni_ui::red()),
+                    )
+                })
+                .when(!open, |d| d.hover(move |s| s.text_color(t.ink)))
+                .on_click(move |_: &ClickEvent, window, cx| pick(value, window, cx));
+            crate::keyboard(tab, &t)
+        }))
+}
+
+/// A square slot for an icon: the picture at `source` when there is one, else the first letter of
+/// `name` on a raised block.
+pub fn slot(source: Option<ImageSource>, name: &str, size: f32, t: &Theme) -> Div {
+    let frame = div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(size))
+        .overflow_hidden()
+        .border_2()
+        .border_color(t.outline)
+        .bg(t.well);
+    match source {
+        Some(source) => frame.child(img(source).size(px(size - 4.)).object_fit(ObjectFit::Cover)),
+        None => frame.bg(t.raised).child(
+            pixel((size * 0.42).round(), FontWeight::BOLD)
+                .text_color(t.muted)
+                .child(
+                    name.chars()
+                        .find(|c| c.is_alphanumeric())
+                        .unwrap_or('?')
+                        .to_uppercase()
+                        .to_string(),
+                ),
+        ),
+    }
+}
