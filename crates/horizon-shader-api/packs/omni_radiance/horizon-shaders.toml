@@ -1,0 +1,144 @@
+schema = 1
+id = "omni_radiance"
+name = "OMNI Radiance"
+version = "0.1.0"
+api = "0.1"
+description = "Soft sun shadows, ray-marched ambient occlusion and colour bounce, volumetric clouds, god rays, stormy lightning and moving water with reflections. Light on the GPU."
+authors = ["OMNI"]
+license = "MIT"
+shared = ["common.wgsl"]
+
+[sky]
+file = "sky.wgsl"
+name = "Sky and clouds"
+clouds = false
+
+[material]
+file = "material.wgsl"
+name = "Light and water"
+
+[shadow]
+resolution = 2048
+distance = 96.0
+option = "shadows"
+
+[reflection]
+option = "reflections"
+
+[[post]]
+file = "post/ao.wgsl"
+name = "Ray-marched light"
+output = "ao"
+scale = 0.5
+
+[[post]]
+file = "post/blur.wgsl"
+name = "Bounce and bloom"
+output = "blur"
+scale = 0.25
+
+[[post]]
+file = "post/compose.wgsl"
+name = "Compose"
+
+[[post]]
+file = "post/grade.wgsl"
+name = "Grade"
+
+[[options]]
+id = "shadows"
+name = "Sun shadows"
+description = "Soft shadows from the sun (the moon at night). The biggest cost; turn off on weak GPUs."
+type = "bool"
+default = true
+
+[[options]]
+id = "reflections"
+name = "Water reflections"
+description = "Water mirrors the land and sky."
+type = "bool"
+default = true
+
+[[options]]
+id = "ao_strength"
+name = "Ambient occlusion"
+description = "Soft dark corners where blocks meet, found by marching rays around each pixel."
+type = "float"
+default = 0.8
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "bounce"
+name = "Colour bounce"
+description = "Light picks up the colour of what is near it: a red wall tints the floor beside it."
+type = "float"
+default = 0.5
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "god_rays"
+name = "Light shafts"
+description = "Sunbeams through gaps in trees and clouds."
+type = "float"
+default = 0.5
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "cloud_amount"
+name = "Clouds"
+description = "How much of the sky the clouds cover."
+type = "float"
+default = 0.5
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "lightning"
+name = "Lightning"
+description = "Flashes and bolts in thunderstorms."
+type = "bool"
+default = true
+
+[[options]]
+id = "water_clear"
+name = "Water clarity"
+description = "Low is deep and murky, high is clear enough to see the bottom."
+type = "float"
+default = 0.6
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "bloom"
+name = "Bloom"
+type = "float"
+default = 0.4
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "vibrance"
+name = "Vibrance"
+type = "float"
+default = 0.5
+min = 0.0
+max = 1.0
+step = 0.05
+
+[[options]]
+id = "vignette"
+name = "Vignette"
+type = "bool"
+default = true
+
+[budget]
+gpu_ms = 2.0
