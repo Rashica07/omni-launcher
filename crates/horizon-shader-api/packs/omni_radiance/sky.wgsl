@@ -113,5 +113,5 @@ fn sky(input: SkyInput) -> vec4<f32> {
     if ls.w > 0.5 {
         c += vec3<f32>(0.85, 0.90, 1.0) * bolt(d, ls.y, ls.z) * 2.5;
     }
-    return vec4<f32>(max(c, vec3<f32>(0.0)), input.color.a);
+    return vec4<f32>(lin(c), input.color.a);
 }

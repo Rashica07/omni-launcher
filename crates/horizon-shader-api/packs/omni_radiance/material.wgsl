@@ -87,7 +87,7 @@ fn water(input: MaterialInput) -> vec4<f32> {
         tex = base;
     }
     let floor_depth = textureLoad(opaque_depth, tex, 0);
-    let floor_color = textureLoad(opaque_color, tex, 0).rgb;
+    let floor_color = enc(textureLoad(opaque_color, tex, 0).rgb);
     // How far light travelled through the water, in blocks. Open sky below the surface counts as deep.
     var thick = 24.0;
     if floor_depth > 0.0 {
@@ -97,7 +97,7 @@ fn water(input: MaterialInput) -> vec4<f32> {
     // Clearer water absorbs more slowly. Red goes first, then green; blue travels furthest.
     let k = mix(1.9, 0.35, water_clear);
     let absorb = exp(-thick * k * vec3<f32>(0.55, 0.16, 0.07));
-    let tone = input.albedo.rgb * input.tint.rgb;
+    let tone = enc(input.albedo.rgb) * enc(input.tint.rgb);
     let day = daylight();
     let sky_l = input.light.y;
     let body = tone * vec3<f32>(0.16, 0.52, 0.62) * (0.35 + 0.65 * max(day, 0.12)) * pow(max(sky_l, 0.15), 1.5);
@@ -111,7 +111,7 @@ fn water(input: MaterialInput) -> vec4<f32> {
     var mirror = sky_gradient(vec3<f32>(rdir.x, abs(rdir.y), rdir.z)) * pow(max(sky_l, 0.2), 1.2);
     if frame.has_reflection == 1u && reflections {
         let ruv = clamp(input.screen + n.xz * vec2<f32>(0.03, 0.05) * top, vec2<f32>(0.002), vec2<f32>(0.998));
-        let m = textureSampleLevel(reflection, reflection_sampler, ruv, 0.0).rgb;
+        let m = enc(textureSampleLevel(reflection, reflection_sampler, ruv, 0.0).rgb);
         mirror = m;
     }
     // The sun's glitter.
@@ -126,7 +126,7 @@ fn water(input: MaterialInput) -> vec4<f32> {
     color = mix(color, vec3<f32>(0.92, 0.96, 1.0) * mix(0.35, 1.0, day), foam);
     // Lightning shows in the water.
     color += vec3<f32>(0.5, 0.56, 0.8) * lightning_state().x * frame.thunder * 0.3 * (0.4 + fres);
-    return vec4<f32>(color, input.albedo.a * 0.0 + 1.0);
+    return vec4<f32>(lin(color), 1.0);
 }
 
 fn material(input: MaterialInput) -> Surface {
@@ -153,15 +153,15 @@ fn material(input: MaterialInput) -> Surface {
     let sun_i = mix(0.30, 1.0, day);
     let flash = lightning_state().x * frame.thunder;
     // Vanilla's face shade and occlusion come in with the tint; keep half of the face shade so the blocks stay readable.
-    let shade = mix(vec3<f32>(1.0), input.tint.rgb, 0.7);
+    let shade = mix(vec3<f32>(1.0), enc(input.tint.rgb), 0.7);
 
     // Wet ground in and after the rain: darker, a touch glossy.
     let wet = frame.wetness * smoothstep(0.5, 1.0, n.y) * pow(sky_l, 2.0);
-    var albedo = input.albedo.rgb * mix(vec3<f32>(1.0), vec3<f32>(0.72, 0.74, 0.78), wet * 0.6);
+    var albedo = enc(input.albedo.rgb) * mix(vec3<f32>(1.0), vec3<f32>(0.72, 0.74, 0.78), wet * 0.6);
 
     var light = ambient_light(n, sky_l) + light_color() * ndl * vis * storm * sun_i * 1.15;
     light += vec3<f32>(0.40, 0.46, 0.72) * flash * (0.5 + 0.5 * n.y) * pow(sky_l, 1.5);
-    light += block_light(input.light.x) + input.colored_light * 1.2;
+    light += block_light(input.light.x) + enc(input.colored_light) * 1.2;
     var color = albedo * shade * light + albedo * input.emission * 2.2;
 
     // A little shine: LabPBR smoothness where a resource pack has it, wet ground otherwise.
@@ -184,5 +184,5 @@ fn material(input: MaterialInput) -> Surface {
     if !input.translucent {
         set_surface(n, smooth_, 0.0);
     }
-    return Surface(vec4<f32>(color, input.albedo.a * input.tint.a));
+    return Surface(vec4<f32>(lin(color), input.albedo.a * input.tint.a));
 }

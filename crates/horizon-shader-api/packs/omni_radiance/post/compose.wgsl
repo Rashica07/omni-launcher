@@ -16,7 +16,7 @@ fn open_light(uv: vec2<f32>) -> vec2<f32> {
 }
 
 fn post(input: PostInput) -> vec4<f32> {
-    var c = input.color.rgb;
+    var c = enc(input.color.rgb);
     let depth = input.depth;
     let day = daylight();
     let flash = lightning_state().x * frame.thunder;
@@ -27,7 +27,7 @@ fn post(input: PostInput) -> vec4<f32> {
         let shade = ol.x * mix(1.0, ol.y, 0.55 * max(day, 0.2));
         c *= shade;
         // Colour bounce: the hue of what is near, without making the picture brighter.
-        let b = textureSampleLevel(blur, linear_sampler, input.uv, 0.0).rgb;
+        let b = enc(textureSampleLevel(blur, linear_sampler, input.uv, 0.0).rgb);
         let chroma = b - vec3<f32>(luminance(b));
         c += c * chroma * bounce * 1.6 * (0.5 + 0.5 * (1.0 - ol.x));
     }
@@ -56,7 +56,7 @@ fn post(input: PostInput) -> vec4<f32> {
 
     // Bloom from the soft copy.
     if bloom > 0.0 {
-        let b = textureSampleLevel(blur, linear_sampler, input.uv, 0.0).rgb;
+        let b = enc(textureSampleLevel(blur, linear_sampler, input.uv, 0.0).rgb);
         c += b * smoothstep(0.55, 1.15, luminance(b)) * bloom * 1.1;
     }
 
@@ -69,5 +69,5 @@ fn post(input: PostInput) -> vec4<f32> {
 
     // Lightning lights the whole picture for a moment.
     c = c * (1.0 + flash * 0.45) + vec3<f32>(0.30, 0.34, 0.50) * flash * 0.25;
-    return vec4<f32>(c, input.color.a);
+    return vec4<f32>(lin(c), 1.0);
 }

@@ -4,7 +4,7 @@ override vibrance: f32 = 0.5;
 override vignette: bool = true;
 
 fn post(input: PostInput) -> vec4<f32> {
-    var c = max(input.color.rgb, vec3<f32>(0.0));
+    var c = enc(input.color.rgb);
     // Shoulder: linear to 0.7, then a smooth roll-off toward 1.
     let hi = max(c - vec3<f32>(0.7), vec3<f32>(0.0));
     c = min(c, vec3<f32>(0.7)) + 0.3 * (1.0 - exp(-hi / 0.3));
@@ -22,5 +22,5 @@ fn post(input: PostInput) -> vec4<f32> {
         let d = length((input.uv - 0.5) * vec2<f32>(aspect, 1.0)) / length(vec2<f32>(aspect, 1.0) * 0.5);
         c *= 1.0 - smoothstep(0.55, 1.15, d) * 0.28;
     }
-    return vec4<f32>(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)), input.color.a);
+    return vec4<f32>(lin(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0))), 1.0);
 }

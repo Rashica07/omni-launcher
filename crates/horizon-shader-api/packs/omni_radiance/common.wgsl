@@ -1,4 +1,13 @@
 // Shared by every stage: noise, the sun's colour, the sky without clouds (water reflects it) and lightning.
+// Shader API 0.2 hands over and takes back linear light. The looks below are written in display values (what they
+// were tuned in), so each stage decodes its inputs with `enc` and encodes its result with `lin`.
+fn enc(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+}
+fn lin(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(2.2));
+}
+
 fn luminance(c: vec3<f32>) -> f32 {
     return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
