@@ -18,6 +18,9 @@ sun = false
 file = "material.wgsl"
 name = "Shadows, lights, water"
 
+[weather]
+file = "weather.wgsl"
+
 [shadow]
 resolution = 2048
 distance = 96.0
