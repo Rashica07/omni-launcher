@@ -1,117 +1,92 @@
-// Sky, volumetric-looking clouds and lightning. The clouds are a slab a few hundred blocks up: the ray crosses it in a
-// handful of steps, each step reads a cheap fractal noise shaped by height (flat bottoms, puffy tops), and one
-// extra read toward the sun gives the self-shadowing that makes them look thick.
-override cloud_amount: f32 = 0.5;
+// OMNI Glow's sky (a deeper blue overhead, a warm band at the horizon), kept on top of the game's own sky and clouds,
+// plus a lightning flash and bolt in thunderstorms.
+override sky_depth: f32 = 0.6;
 
-const CLOUD_BASE: f32 = 230.0;
-const CLOUD_TOP: f32 = 330.0;
+fn bolt(d: vec3<f32>, az: f32, since: f32) -> f32 {
+    let a = atan2(d.x, d.z);
+    var diff = abs(a - (az - 3.14159));
+    diff = min(diff, 6.2831853 - diff);
+    let wob = sin(d.y * 38.0 + az * 7.0) * 0.012 + sin(d.y * 91.0 + az) * 0.006;
+    let w = abs(diff + wob) * (1.0 - d.y * 0.5);
+    let core = exp(-w * 260.0);
+    let glow = exp(-w * 28.0) * 0.25;
+    return (core + glow) * smoothstep(0.02, 0.15, d.y) * (1.0 - smoothstep(0.55, 0.95, d.y)) * exp(-since * 7.0);
+}
+
+override cloud_amount: f32 = 0.55;
 
 fn fbm(p: vec2<f32>) -> f32 {
     var a = 0.5;
     var s = 0.0;
     var q = p;
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 5; i++) {
         s += a * vnoise(q);
-        q = q * 2.03 + vec2<f32>(17.1, 9.2);
+        q = q * 2.07 + vec2<f32>(17.1, 9.2);
         a *= 0.5;
     }
     return s;
 }
 
-// Cloud density at a world point (0 none).
-fn density(p: vec3<f32>, coverage: f32) -> f32 {
-    let h = clamp((p.y - CLOUD_BASE) / (CLOUD_TOP - CLOUD_BASE), 0.0, 1.0);
-    // Flat bottom, rounded top.
-    let shape = smoothstep(0.0, 0.15, h) * (1.0 - smoothstep(0.55, 1.0, h));
-    let wind = vec2<f32>(frame.time * 1.6, frame.time * 0.7);
-    let uv = (p.xz + wind) * 0.0042;
-    let n = fbm(uv) * 0.75 + vnoise(uv * 6.0 + 3.0) * 0.25;
-    return clamp((n - (1.0 - coverage)) * 3.2, 0.0, 1.0) * shape;
+// Cloud density at a point of the layer, 0 clear.
+fn cloud_density(p: vec2<f32>, coverage: f32) -> f32 {
+    let q = (p + vec2<f32>(frame.time * 1.8, frame.time * 0.8)) * 0.0030;
+    let n = fbm(q) * 0.8 + vnoise(q * 9.0) * 0.2;
+    return clamp((n - (1.0 - coverage)) * 7.0, 0.0, 1.0);
 }
 
-// Returns (rgb colour of the cloud, alpha). `lit` is the light colour reaching the tops.
-fn clouds(dir: vec3<f32>, coverage: f32, flash: f32) -> vec4<f32> {
-    if dir.y < 0.015 {
-        return vec4<f32>(0.0);
+// Clouds: a layer 260 blocks up, fluffy edges, lit from the sun's side, dark where thick, silver along the rim.
+fn cloud_layer(d: vec3<f32>, base: vec3<f32>, flash: f32) -> vec3<f32> {
+    if d.y < 0.012 {
+        return base;
     }
-    let cam_y = frame.camera_position.y;
-    let t0 = (CLOUD_BASE - cam_y) / dir.y;
-    let t1 = (CLOUD_TOP - cam_y) / dir.y;
-    if t1 <= 0.0 {
-        return vec4<f32>(0.0);
-    }
-    let start = max(t0, 0.0);
-    let steps = 6;
-    let dt = (t1 - start) / f32(steps);
-    let origin = vec3<f32>(frame.camera_position.x, cam_y, frame.camera_position.z);
-    let jitter = hash21(dir.xz * 713.0 + frame.time) * 0.0;
-    let sun = frame.sun_direction;
-    let day = daylight();
-    var transmit = 1.0;
-    var light = vec3<f32>(0.0);
-    let toward = max(dot(dir, sun), 0.0);
-    // Silver lining: forward scattering toward the sun.
-    let phase = 0.55 + 1.6 * pow(toward, 8.0);
-    let sun_col = light_color() * 1.15;
     let storm = clamp(frame.rain * 0.7 + frame.thunder * 0.5, 0.0, 1.0);
-    let ambient = mix(vec3<f32>(0.04, 0.05, 0.09), mix(vec3<f32>(0.46, 0.55, 0.70), vec3<f32>(0.30, 0.33, 0.38), storm), day);
-    for (var i = 0; i < steps; i++) {
-        let p = origin + dir * (start + (f32(i) + 0.5 + jitter) * dt);
-        let d = density(p, coverage);
-        if d > 0.01 {
-            // One step toward the light: how much cloud lies between this point and the sun.
-            let shadow_d = density(p + sun * 38.0, coverage) + density(p + sun * 90.0, coverage) * 0.6;
-            let beer = exp(-shadow_d * 2.4) * mix(1.0, 0.45, storm);
-            let h = clamp((p.y - CLOUD_BASE) / (CLOUD_TOP - CLOUD_BASE), 0.0, 1.0);
-            let direct = sun_col * beer * phase * day;
-            let amb = ambient * (0.55 + 0.45 * h);
-            var c = direct + amb;
-            // Lightning lights the cloud from inside.
-            c += vec3<f32>(0.75, 0.82, 1.0) * flash * 2.2;
-            let a = 1.0 - exp(-d * dt * 0.045);
-            light += transmit * a * c;
-            transmit *= 1.0 - a;
-            if transmit < 0.03 {
-                break;
-            }
-        }
+    let coverage = clamp(0.22 + cloud_amount * 0.45 + frame.rain * 0.3, 0.0, 0.95);
+    let t = (260.0 - frame.camera_position.y) / d.y;
+    if t <= 0.0 {
+        return base;
     }
-    return vec4<f32>(light, 1.0 - transmit);
-}
-
-// A jagged bolt from a cloud down toward the horizon, at compass angle `az`.
-fn bolt(dir: vec3<f32>, az: f32, since: f32) -> f32 {
-    if dir.y < 0.03 || dir.y > 0.75 {
-        return 0.0;
+    let p = (frame.camera_position + d * t).xz;
+    let dens = cloud_density(p, coverage);
+    if dens <= 0.0 {
+        return base;
     }
-    let ang = atan2(dir.x, dir.z);
-    var da = ang - az;
-    da = atan2(sin(da), cos(da));
-    // The path wanders, with a few branches.
-    let y = dir.y;
-    let wander = (vnoise(vec2<f32>(y * 18.0, az * 5.0)) - 0.5) * 0.10 + (vnoise(vec2<f32>(y * 50.0, az)) - 0.5) * 0.035;
-    let branch = (vnoise(vec2<f32>(y * 22.0 + 4.0, az * 3.0)) - 0.5) * 0.22 * smoothstep(0.35, 0.05, y);
-    let core = exp(-pow(abs(da - wander) * 190.0, 2.0));
-    let glow = exp(-abs(da - wander) * 22.0) * 0.25;
-    let side = exp(-pow(abs(da - wander - branch) * 260.0, 2.0)) * 0.5 * step(0.12, y);
-    let fade = smoothstep(0.75, 0.55, y) * smoothstep(0.03, 0.10, y);
-    return (core + glow + side) * fade * exp(-since * 7.0);
+    let day = daylight();
+    let sun = frame.sun_direction;
+    // The same cloud a little toward the sun: less there means we're on the lit rim, more means we're in shade.
+    let toward = normalize(vec2<f32>(sun.x, sun.z) + vec2<f32>(0.0001)) * 55.0;
+    let ahead = cloud_density(p + toward, coverage);
+    let rim = clamp((dens - ahead) * 1.8 + 0.55, 0.0, 1.0);
+    let thick = smoothstep(0.1, 1.0, dens);
+    let cos_s = max(dot(d, sun), 0.0);
+    let silver = pow(cos_s, 10.0) * (1.0 - thick * 0.6);
+    let lit = light_color() * 1.25 * mix(0.25, 1.0, rim) * mix(1.0, 0.45, storm);
+    let shade = mix(vec3<f32>(0.05, 0.06, 0.1), mix(vec3<f32>(0.62, 0.72, 0.88), vec3<f32>(0.30, 0.33, 0.38), storm), day);
+    var c = mix(shade * (1.0 - 0.45 * thick), lit, rim * day * (1.0 - 0.5 * thick)) + light_color() * silver * 0.9 * day;
+    c += vec3<f32>(0.7, 0.78, 1.0) * flash * (0.8 + 0.6 * thick);
+    // Far clouds melt into the horizon haze.
+    let fade = smoothstep(0.02, 0.22, d.y);
+    return mix(base, c, clamp(dens * 1.2, 0.0, 1.0) * fade);
 }
 
 fn sky(input: SkyInput) -> vec4<f32> {
-    let d = normalize(input.direction);
-    var c = sky_gradient(d);
+    let d = input.direction;
+    let day = daylight() * (1.0 - frame.rain * 0.8);
+    let up = smoothstep(0.05, 1.0, d.y);
+    let near_horizon = 1.0 - smoothstep(0.0, 0.35, abs(d.y));
+    let toward = max(dot(normalize(vec3<f32>(d.x, 0.0, d.z) + vec3<f32>(0.0001)), normalize(vec3<f32>(frame.sun_direction.x, 0.0, frame.sun_direction.z) + vec3<f32>(0.0001))), 0.0);
+    var c = mix(input.color.rgb, input.color.rgb * vec3<f32>(0.62, 0.80, 1.25), up * day * sky_depth);
+    let band = near_horizon * (0.25 + 0.75 * pow(toward, 3.0)) * mix(0.25, 1.0, sun_low()) * day * sky_depth;
+    c += vec3<f32>(1.0, 0.70, 0.40) * band * 0.45;
     let ls = lightning_state();
-    let flash = ls.x * frame.thunder;
-    let cover = clamp(0.25 + cloud_amount * 0.55 + frame.rain * 0.35 + frame.thunder * 0.2, 0.0, 0.95);
-    let cl = clouds(d, cover, flash);
-    // Haze softens clouds far down the sky.
-    let haze = smoothstep(0.02, 0.28, d.y);
-    c = mix(c, cl.rgb, cl.a * haze);
-    // Sky lit by a flash.
-    c += vec3<f32>(0.45, 0.52, 0.75) * flash * 0.55;
+    let dn = normalize(d);
+    // The sun: a bright disc with a soft corona, hidden behind thick cloud by the cloud layer below.
+    let cs = max(dot(dn, frame.sun_direction), 0.0);
+    let disc = smoothstep(0.99935, 0.9997, cs);
+    c += light_color() * (disc * 4.0 + pow(cs, 90.0) * 0.8 + pow(cs, 14.0) * 0.18) * daylight() * (1.0 - frame.rain * 0.9);
+    c = cloud_layer(dn, c, ls.x * frame.thunder);
+    c += vec3<f32>(0.35, 0.42, 0.7) * ls.x * frame.thunder * 0.35;
     if ls.w > 0.5 {
-        c += vec3<f32>(0.85, 0.90, 1.0) * bolt(d, ls.y, ls.z) * 2.5;
+        c += vec3<f32>(0.8, 0.85, 1.0) * bolt(normalize(d), ls.y, ls.z) * 2.0;
     }
-    return vec4<f32>(lin(c), input.color.a);
+    return vec4<f32>(c, input.color.a);
 }

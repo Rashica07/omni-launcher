@@ -1,9 +1,11 @@
 # OMNI Radiance
 
-A lightweight SEUS-style shader pack for the OMNI Client: ray-marched ambient occlusion and contact shadows, colour bounce,
-volumetric clouds, light shafts, lightning, and water with refraction and reflections.
+Built on OMNI Glow, for shader API 0.2 (linear light). Vanilla light with soft sun shadows (warm sun, cool shade),
+layered clouds and a sun with glow, thunderstorm lightning, water that mirrors the sky, ambient occlusion and light
+shafts, soft bloom and a clean grade.
 
-Written for shader API 0.2 (linear light).
+Ambient occlusion and light shafts (`post/rays.wgsl`, helpers in `common.wgsl`) are adapted from
+[Vivid Horizon](https://github.com/Evan-lhm/vivid-horizon) by Evan-lhm, MIT licence; see `LICENSE`.
 
 Install: copy the folder (or `omni_radiance.hshader`) into `shaderpacks/` and pick it in the shader menu.
-Build the file with `horizon-shader pack omni_radiance`. Checked with `horizon-shader check`; 4 to 11 texture reads per pass.
+Build the file with `horizon-shader pack omni_radiance`; check it with `horizon-shader check omni_radiance`.
