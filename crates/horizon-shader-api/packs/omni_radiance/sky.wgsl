@@ -4,13 +4,16 @@ override sky_depth: f32 = 0.6;
 
 fn bolt(d: vec3<f32>, az: f32, since: f32) -> f32 {
     let a = atan2(d.x, d.z);
-    var diff = abs(a - (az - 3.14159));
-    diff = min(diff, 6.2831853 - diff);
-    let wob = sin(d.y * 38.0 + az * 7.0) * 0.012 + sin(d.y * 91.0 + az) * 0.006;
-    let w = abs(diff + wob) * (1.0 - d.y * 0.5);
-    let core = exp(-w * 260.0);
-    let glow = exp(-w * 28.0) * 0.25;
-    return (core + glow) * smoothstep(0.02, 0.15, d.y) * (1.0 - smoothstep(0.55, 0.95, d.y)) * exp(-since * 7.0);
+    // Signed angle from the bolt's compass line, wrapped to -pi..pi, so the path bends smoothly instead of pinching.
+    var sd = a - (az - 3.14159);
+    sd = sd - 6.2831853 * floor((sd + 3.14159) / 6.2831853);
+    let h = d.y;
+    // A jagged path: a slow lean plus two finer zig-zags.
+    let path = sin(h * 7.0 + az * 3.0) * 0.035 + sin(h * 19.0 + az * 5.0) * 0.016 + sin(h * 47.0 + az) * 0.007;
+    let w = abs(sd - path) * (1.0 - h * 0.4);
+    let core = exp(-w * 95.0);
+    let glow = exp(-w * 14.0) * 0.35;
+    return (core + glow) * smoothstep(0.02, 0.15, h) * (1.0 - smoothstep(0.55, 0.95, h)) * exp(-since * 7.0);
 }
 
 override cloud_amount: f32 = 0.55;
