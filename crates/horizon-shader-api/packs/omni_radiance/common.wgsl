@@ -75,3 +75,20 @@ fn hash2(p: vec2<f32>) -> f32 {
     h ^= h >> 16u;
     return f32(h) / 4294967295.0;
 }
+
+// Linear light <-> the gamma space the water's colours were tuned in (Vivid Horizon's water, MIT, Evan-lhm).
+fn to_gamma(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+}
+
+fn to_linear(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(2.2));
+}
+
+fn fog_g() -> vec3<f32> {
+    return to_gamma(frame.fog_color);
+}
+
+fn sky_g() -> vec3<f32> {
+    return to_gamma(frame.sky_color);
+}
