@@ -224,6 +224,18 @@ fn material(input: MaterialInput) -> Surface {
         let lit = mix(cool, warm, vis);
         c = vec4<f32>(c.rgb * mix(vec3<f32>(1.0), lit, sun_share), c.a);
     }
+    // Block light takes the colour of its source: warm near torches, cool by sea lanterns, red by redstone ([[lights]] in
+    // the manifest). Tints vanilla's light instead of adding to it, so nothing burns white (after Vivid Horizon, MIT).
+    if input.fluid == 0u {
+        let near = block_light_color(input.position);
+        let lamp = mix(vec3<f32>(1.0, 0.55, 0.22), near.rgb * 4.0, min(near.a, 1.0));
+        let hue = lamp / max(max(lamp.r, lamp.g), max(lamp.b, 0.001));
+        let day_l = daylight();
+        let fade = 1.0 - day_l * input.light.y * 0.7;
+        let tint = max(pow(input.light.x, 2.0) * fade, min(near.a, 1.0) * input.light.x * 0.6 * fade);
+        let surface = input.albedo.rgb * input.tint.rgb;
+        c = vec4<f32>(c.rgb * mix(vec3<f32>(1.0), hue * 1.15, tint * 0.75) + surface * hue * tint * 0.08, c.a);
+    }
     // Held items, dropped items and mods' lights.
     c = vec4<f32>(c.rgb + input.albedo.rgb * input.tint.rgb * input.colored_light, c.a);
 

@@ -152,5 +152,42 @@ name = "Vignette"
 type = "bool"
 default = true
 
+# Colour of the light from blocks and held items (a warm torch, cool sea lanterns, ...), after Vivid Horizon (MIT).
+[[lights]]
+color = [1.0, 0.55, 0.22]
+blocks = ["torch", "wall_torch", "campfire", "fire", "jack_o_lantern", "furnace", "smoker", "blast_furnace"]
+
+[[lights]]
+color = [1.0, 0.7, 0.38]
+blocks = ["lantern", "glowstone", "shroomlight", "*_candle", "candle", "redstone_lamp"]
+
+[[lights]]
+color = [0.75, 0.92, 1.0]
+blocks = ["sea_lantern", "end_rod", "beacon", "conduit"]
+
+[[lights]]
+color = [1.0, 0.82, 0.4]
+blocks = ["ochre_froglight"]
+
+[[lights]]
+color = [0.6, 1.0, 0.55]
+blocks = ["verdant_froglight"]
+
+[[lights]]
+color = [1.0, 0.62, 0.92]
+blocks = ["pearlescent_froglight"]
+
+[[lights]]
+color = [0.3, 0.75, 1.0]
+blocks = ["soul_*"]
+
+[[lights]]
+color = [1.0, 0.2, 0.1]
+blocks = ["redstone_torch", "redstone_wall_torch", "redstone_ore", "deepslate_redstone_ore"]
+
+[[lights]]
+color = [1.0, 0.45, 0.1]
+blocks = ["lava", "magma_block"]
+
 [budget]
 gpu_ms = 0.9
