@@ -935,6 +935,24 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<ScreenshotsCmd>,
     },
+    /// Join a server OMNIServers hosts: makes (or reuses) an instance on the server's Minecraft
+    /// version, puts the server in its Multiplayer list and selects it. Play then starts it
+    Join {
+        /// The server's address (host or host:port)
+        address: String,
+        /// The server's name (default: the address)
+        #[arg(long)]
+        name: Option<String>,
+        /// The Minecraft version the server runs
+        #[arg(long)]
+        minecraft: String,
+        /// Use this instance instead of the one saved for the server or a new one
+        #[arg(long)]
+        instance: Option<String>,
+        /// Remember the instance for this server
+        #[arg(long)]
+        save: bool,
+    },
     /// The servers in an instance's Multiplayer list (servers.dat): list, add, remove
     Multiplayer {
         #[command(subcommand)]
@@ -1764,6 +1782,13 @@ fn execute(command: Cmd, as_json: bool) -> Result<(), String> {
             action.unwrap_or(ScreenshotsCmd::List { instance: None }),
             as_json,
         )?,
+        Cmd::Join {
+            address,
+            name,
+            minecraft,
+            instance,
+            save,
+        } => join(address, name, minecraft, instance, save, as_json)?,
         Cmd::Multiplayer { action } => multiplayer(
             action.unwrap_or(MultiplayerCmd::List { instance: None }),
             as_json,
@@ -3471,6 +3496,46 @@ fn screenshots(action: ScreenshotsCmd, as_json: bool) -> Result<(), String> {
             screenshots::delete(&shot)?;
             println!("{} is in the trash.", shot.name);
         }
+    }
+    Ok(())
+}
+
+fn join(
+    address: String,
+    name: Option<String>,
+    minecraft: String,
+    instance: Option<String>,
+    save: bool,
+    as_json: bool,
+) -> Result<(), String> {
+    use horizon_launcher::join;
+    let data = backend::data_dir();
+    let request = join::Request {
+        name: name.unwrap_or_else(|| address.clone()),
+        address: address.clone(),
+        public_address: None,
+        minecraft,
+        created: join::now(),
+    };
+    let all = instances::list();
+    let pick = match instance {
+        Some(q) => join::Pick::Existing(Box::new(instances::find(&q)?)),
+        None => {
+            let saved = join::saved(&data, &address);
+            let found = join::candidates(&all, &request.minecraft, saved.as_deref());
+            match found.into_iter().next().filter(|i| {
+                saved.as_deref() == Some(i.id.as_str()) || i.name.starts_with("OMNI: ")
+            }) {
+                Some(i) => join::Pick::Existing(Box::new(i)),
+                None => join::Pick::New,
+            }
+        }
+    };
+    let made = join::prepare(&request, pick, save, &data)?;
+    if as_json {
+        json(serde_json::json!({ "instance": made.id, "name": made.name, "address": address }));
+    } else {
+        println!("Ready: {} is selected and has {} in its Multiplayer list.", made.name, address.trim());
     }
     Ok(())
 }

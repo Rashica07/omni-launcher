@@ -752,6 +752,20 @@ Move a screenshot to the system's trash.
 
 MCP: `screenshots_delete`, needs `confirm: true`.
 
+## `horizon-launcher join`
+
+Join a server OMNIServers hosts: makes (or reuses) an instance on the server's Minecraft version, puts the server in its Multiplayer list and selects it. Play then starts it.
+
+    horizon-launcher join --minecraft <MINECRAFT> <ADDRESS>
+
+- `ADDRESS`: The server's address (host or host:port)
+- `--name`: The server's name (default: the address)
+- `--minecraft`: The Minecraft version the server runs
+- `--instance`: Use this instance instead of the one saved for the server or a new one
+- `--save`: Remember the instance for this server
+
+MCP: `join`.
+
 ## `horizon-launcher multiplayer list`
 
 The servers of the game's Multiplayer screen (the default).

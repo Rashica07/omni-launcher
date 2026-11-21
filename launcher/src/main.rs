@@ -26,6 +26,7 @@ mod glass_home_mods;
 mod glass_home_packs;
 mod glass_home_tabs;
 mod glass_instance;
+mod glass_join_dialog;
 mod glass_instance_java;
 mod glass_palette;
 mod glass_settings;
@@ -423,6 +424,9 @@ struct Launcher {
     joining: Option<String>,
     /// Where the next start goes at once: `--world <folder>` or `--server <address>`.
     quick_play: Option<(&'static str, String)>,
+    /// The Join popup OMNIServers asked for, and when the launcher last looked for a request.
+    join: Option<glass_join_dialog::JoinDraft>,
+    join_polled: Instant,
     /// The instance the running game plays and when it started: its play time grows on exit.
     client_run: Option<(String, Instant)>,
     /// The running game's instance variables, for its post-exit command.
@@ -727,6 +731,8 @@ impl Launcher {
             friend_focus: cx.focus_handle(),
             joining: None,
             quick_play: None,
+            join: None,
+            join_polled: Instant::now(),
             client_run: None,
             client_vars: Vec::new(),
             collection: collection::Collection::load(),
@@ -1120,6 +1126,7 @@ impl Launcher {
 
     fn drain(&mut self, cx: &mut Context<Self>) {
         let mut changed = false;
+        changed |= self.poll_join();
         self.perf.tick();
         match self.bench.as_mut().map(|b| b.tick(&self.perf)) {
             Some(perf::Step::Go(page)) => {
@@ -5762,6 +5769,9 @@ impl Render for Launcher {
         root = self.import_drop_target(root, cx);
         root = root.children(self.import_note(cx));
         if let Some(dialog) = self.instance_dialog(cx) {
+            root = root.child(dialog);
+        }
+        if let Some(dialog) = self.join_dialog(cx) {
             root = root.child(dialog);
         }
         if let Some(panel) = self.native_log_panel(cx) {
