@@ -104,7 +104,7 @@ impl Launcher {
             this.join = None;
             cx.notify();
         });
-        let card = ui::dialog_plate(radius::MODAL)
+        let card = ui::dialog_plate_solid(radius::MODAL)
             .id("join-card")
             .occlude()
             .flex()
@@ -133,7 +133,7 @@ impl Launcher {
                         .top_0()
                         .left_0()
                         .size_full()
-                        .bg(ui::scrim())
+                        .bg(ui::scrim().opacity(1.4))
                         .on_mouse_down(gpui::MouseButton::Left, close),
                 )
                 .child(card),

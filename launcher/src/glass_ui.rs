@@ -571,6 +571,25 @@ pub fn dialog_plate(radius: f32) -> Div {
         .child(layer(white(horizon_theme::glass::TINT)))
 }
 
+/// A dialog's plate that you can't see through: [`dialog_plate`] with a near-opaque fill under the content. For dialogs that carry
+/// forms (the Join popup), where the page showing through the glass made the text hard to read.
+pub fn dialog_plate_solid(radius: f32) -> Div {
+    let fill = if light() {
+        white(0.96)
+    } else {
+        color(horizon_theme::glass::SCRIM).opacity(0.96)
+    };
+    dialog_plate(radius).child(
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .rounded(px(radius))
+            .bg(fill),
+    )
+}
+
 /// Text on a white button (`SOLID`): `#100a1f`, medium.
 pub fn solid(
     id: impl Into<SharedString>,
